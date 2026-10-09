@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+echo "=== Starting HAProxy ==="
+haproxy -f /etc/haproxy/haproxy.cfg -D
+
+echo "=== Starting Keepalived ==="
+exec keepalived --dont-fork --log-console --log-detail -f /etc/keepalived/keepalived.conf

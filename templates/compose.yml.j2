@@ -1,0 +1,66 @@
+networks:
+  ha_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+
+services:
+  # --- Backend Web Servers ---
+  web1:
+    image: nginxdemos/hello
+    container_name: web1
+    hostname: web1
+    networks:
+      ha_net:
+        ipv4_address: 192.168.100.11
+
+  web2:
+    image: nginxdemos/hello
+    container_name: web2
+    hostname: web2
+    networks:
+      ha_net:
+        ipv4_address: 192.168.100.12
+
+  web3:
+    image: nginxdemos/hello
+    container_name: web3
+    hostname: web3
+    networks:
+      ha_net:
+        ipv4_address: 192.168.100.13
+
+  # --- Load Balancer 1 (Master) ---
+  lb1:
+    build:
+      context: ./lb
+    container_name: lb1
+    hostname: lb1
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    volumes:
+      - ./lb/haproxy.cfg:/etc/haproxy/haproxy.cfg:ro
+      - ./lb1/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+    networks:
+      ha_net:
+        ipv4_address: 192.168.100.2
+
+  # --- Load Balancer 2 (Backup) ---
+  lb2:
+    build:
+      context: ./lb
+    container_name: lb2
+    hostname: lb2
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    volumes:
+      - ./lb/haproxy.cfg:/etc/haproxy/haproxy.cfg:ro
+      - ./lb2/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+    networks:
+      ha_net:
+        ipv4_address: 192.168.100.3

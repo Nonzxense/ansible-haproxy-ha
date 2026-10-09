@@ -1,0 +1,64 @@
+---
+- name: Deploy HA Cluster Infrastructure
+  hosts: ha_cluster
+  become: true
+  vars_files:
+    - vault.yml
+
+  tasks:
+    - name: Set Keepalived variables per host
+      ansible.builtin.set_fact:
+        keepalived_role: "{{ 'MASTER' if inventory_hostname == 'lb1' else 'BACKUP' }}"
+        keepalived_priority: "{{ 101 if inventory_hostname == 'lb1' else 100 }}"
+
+    - name: Create local template directories
+      ansible.builtin.file:
+        path: /opt/ha-cluster/lb
+        state: directory
+        mode: '0755'
+
+    - name: Ensure keepalived directories exist for both LBs
+      ansible.builtin.file:
+        path: "/opt/ha-cluster/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - lb1
+        - lb2
+
+    - name: Generate Keepalived config for LB1 (MASTER)
+      ansible.builtin.template:
+        src: templates/keepalived.conf.j2
+        dest: /opt/ha-cluster/lb1/keepalived.conf
+        mode: '0644'
+      vars:
+        keepalived_role: MASTER
+        keepalived_priority: 101
+
+    - name: Generate Keepalived config for LB2 (BACKUP)
+      ansible.builtin.template:
+        src: templates/keepalived.conf.j2
+        dest: /opt/ha-cluster/lb2/keepalived.conf
+        mode: '0644'
+      vars:
+        keepalived_role: BACKUP
+        keepalived_priority: 100
+
+    - name: Copy Dockerfile, entrypoint, HAProxy config, and compose templates
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode | default('0644') }}"
+      loop:
+        - { src: 'templates/lb/Dockerfile', dest: '/opt/ha-cluster/lb/Dockerfile' }
+        - { src: 'templates/lb/entrypoint.sh.j2', dest: '/opt/ha-cluster/lb/entrypoint.sh', mode: '0755' }
+        - { src: 'templates/lb/haproxy.cfg.j2', dest: '/opt/ha-cluster/lb/haproxy.cfg' }
+        - { src: 'templates/compose.yml.j2', dest: '/opt/ha-cluster/compose.yml' }
+
+    - name: Run Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: /opt/ha-cluster
+        state: present
+        build: always
+        recreate: always
+      run_once: true
