@@ -9,6 +9,6 @@ vrrp_instance VI_1 {
         auth_pass {{ vault_keepalived_pass }}
     }
     virtual_ipaddress {
-        192.168.100.100/24
+        {{ virtual_ip }}
     }
 }
